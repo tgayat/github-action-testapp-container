@@ -1,0 +1,66 @@
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+
+name: Build and deploy container app to Azure Web App - wap2805
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read #This is required for actions/checkout
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to container registry
+        uses: docker/login-action@v2
+        with:
+          registry: testerregistry.azurecr.io/
+          username: ${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_D54E905CAD204C5C83FFBC76ABCA5FC9 }}
+          password: ${{ secrets.AZUREAPPSERVICE_CONTAINERPASSWORD_7347AD0174AE43729FD7D875C0B13C40 }}
+
+      - name: Build and push container image to registry
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          push: true
+          tags: testerregistry.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_D54E905CAD204C5C83FFBC76ABCA5FC9 }}/samples/nginx:${{ github.sha }}
+          file: ./Dockerfile
+
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write #This is required for requesting the JWT
+      contents: read #This is required for actions/checkout
+
+    needs: build
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+
+    steps:
+      
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_961DA5D0BFB7483AA66EFDB289643B58 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_F7E66AB24CB04F25B60F98277C90CD2E }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_F7389EF464754B039DF17422CC2A27A4 }}
+
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: 'wap2805'
+          slot-name: 'Production'
+          images: 'testerregistry.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_D54E905CAD204C5C83FFBC76ABCA5FC9 }}/samples/nginx:${{ github.sha }}'
+          
